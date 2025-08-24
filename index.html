@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HedApp - ระบบบันทึกข้อมูลการเพาะเห็ด</title>
+  <!-- Font Awesome 6 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+  <style>
+    :root{
+      --primary:#4CAF50;--primary-light:#8BC34A;--primary-dark:#388E3C;
+      --secondary:#795548;--accent:#FF9800;--light:#F1F8E9;--dark:#1B5E20;
+      --text:#212121;--text-light:#757575;--background:#E8F5E9;--card-bg:#FFFFFF;
+      --success:#4CAF50;--warning:#FFC107;--danger:#F44336;--info:#2196F3;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI','Prompt',sans-serif;}
+    body{background:var(--background);color:var(--text);line-height:1.6;min-height:100vh;}
+    .app-container{display:flex;flex-direction:column;min-height:100vh;max-width:1200px;margin:0 auto;background:var(--card-bg);box-shadow:0 0 15px rgba(0,0,0,.1);}
+
+    /* Header */
+    header{
+      position: relative;
+      background:linear-gradient(135deg,var(--primary),var(--primary-dark));
+      color:#fff;padding:1.2rem;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.1);
+    }
+    .logo{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;}
+    .logo i{font-size:2rem}
+    .logo h1{font-size:1.8rem;font-weight:600}
+
+    /* ปุ่มขีด 3 ขีด (Hamburger) */
+    .menu-trigger{
+      position:absolute;left:12px;top:12px;
+      background:transparent;border:none;color:#fff;font-size:1.4rem;
+      padding:8px;border-radius:10px;cursor:pointer;
+    }
+    .menu-trigger:focus{outline:2px solid rgba(255,255,255,.6);outline-offset:2px;}
+
+    /* Main Navigation (desktop) */
+    .main-nav{display:flex;flex-direction:column;align-items:center;padding:1rem;background:var(--primary-light);position:sticky;top:0;z-index:100}
+    .nav-list{list-style:none;display:flex;flex-wrap:wrap;justify-content:center;gap:5px;width:100%}
+    .nav-item{flex:1;min-width:140px;max-width:200px}
+    .nav-link{display:flex;flex-direction:column;align-items:center;text-decoration:none;color:#fff;background:var(--primary);padding:12px 10px;border-radius:8px;transition:.3s;text-align:center}
+    .nav-link:hover,.nav-link.active{background:var(--primary-dark);transform:translateY(-3px);box-shadow:0 4px 8px rgba(0,0,0,.15)}
+    .nav-link i{font-size:1.5rem;margin-bottom:5px}
+
+    /* Main Content */
+    .main-content{flex:1;padding:1.5rem;overflow-y:auto}
+    .page{display:none}
+    .page.active{display:block;animation:fadeIn .5s ease}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+    .page-title{color:var(--primary-dark);margin-bottom:1.5rem;padding-bottom:.5rem;border-bottom:2px solid var(--primary-light);display:flex;align-items:center;gap:10px}
+
+    /* Cards / Forms / Tables */
+    .card{background:var(--card-bg);border-radius:10px;box-shadow:0 4px 8px rgba(0,0,0,.08);padding:1.5rem;margin-bottom:1.5rem}
+    .form-group{margin-bottom:1.2rem}
+    .form-group label{display:block;margin-bottom:.5rem;color:var(--primary-dark);font-weight:500}
+    .form-control{width:100%;padding:12px 15px;border:1px solid #ddd;border-radius:6px;font-size:1rem;transition:border-color .3s}
+    .form-control:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 3px rgba(76,175,80,.2)}
+    .btn{display:inline-block;background:var(--primary);color:#fff;border:none;padding:12px 20px;border-radius:6px;cursor:pointer;font-size:1rem;font-weight:500;transition:.3s}
+    .btn:hover{background:var(--primary-dark);transform:translateY(-2px);box-shadow:0 4px 8px rgba(0,0,0,.1)}
+    .btn[disabled]{opacity:.6;cursor:not-allowed;transform:none;box-shadow:none}
+    .btn-block{display:block;width:100%}
+    .table-responsive{overflow-x:auto;margin-bottom:1.5rem}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:12px 15px;text-align:left;border-bottom:1px solid #ddd}
+    th{background:var(--primary-light);color:#fff;font-weight:500}
+    tr:nth-child(even){background:#f9f9f9}
+    tr:hover{background:#f1f8e9}
+
+    /* Summary Cards */
+    .summary-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1.2rem;margin-bottom:1.5rem}
+    .summary-card{background:linear-gradient(135deg,var(--primary-light),var(--primary));color:#fff;border-radius:10px;padding:1.2rem;box-shadow:0 4px 8px rgba(0,0,0,.1)}
+    .summary-card h3{font-size:1.1rem;margin-bottom:.8rem;display:flex;align-items:center;gap:8px}
+    .summary-card .value{font-size:1.8rem;font-weight:600;text-align:right}
+
+    /* Footer */
+    footer{background:var(--primary-dark);color:#fff;text-align:center;padding:1.2rem;margin-top:auto}
+    .muted{color:var(--text-light)}
+
+    /* Hamburger Drawer (slide-in left) */
+    #menu-overlay{
+      position:fixed;inset:0;background:rgba(0,0,0,.28);opacity:0;pointer-events:none;
+      transition:opacity .22s ease;backdrop-filter:saturate(120%) blur(1.5px);z-index:1190;
+    }
+    #menu-overlay.show{opacity:1;pointer-events:auto;}
+    #menu-panel{
+      position:fixed;left:0;top:0;bottom:0;width:min(85vw,340px);
+      background:#fff;border-right:1px solid #ececec;box-shadow:0 14px 36px rgba(0,0,0,.25);
+      transform:translateX(-100%);transition:transform .24s ease;padding:.5rem 0;z-index:1200;overflow:auto;
+    }
+    #menu-panel.open{transform:translateX(0);}
+    #menu-panel .menu-header{font-weight:700;color:var(--primary-dark);padding:.6rem 1rem;border-bottom:1px solid #f0f0f0}
+    #menu-list{list-style:none;margin:.25rem 0;padding:0}
+    #menu-list li{margin:.1rem 0}
+    #menu-list button{
+      width:100%;display:flex;align-items:center;gap:12px;padding:.7rem 1rem;background:transparent;border:none;
+      font-size:1rem;color:var(--text);cursor:pointer;border-radius:10px;
+    }
+    #menu-list button i{width:1.25rem;text-align:center}
+    #menu-list button:hover{background:#f3f7f3}
+    #menu-list button.active{background:#e8f5e9;color:var(--primary-dark);font-weight:600}
+
+    /* Responsive */
+    @media (max-width:768px){
+      .main-nav{display:none;}            /* ซ่อนแถบเมนูเดิม ใช้ hamburger แทน */
+      .main-content{padding:1rem;}        /* ลด padding ให้พอดีจอ */
+      .summary-cards{grid-template-columns:1fr;}
+      .logo h1{font-size:1.5rem}
+      .card{padding:1rem}
+      .page-title{font-size:1.4rem}
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <!-- ปุ่มขีด 3 ขีด -->
+      <button class="menu-trigger" aria-label="เมนูหลัก" aria-haspopup="true" aria-expanded="false" title="เมนู">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+
+      <div class="logo">
+        <i class="fa-solid fa-seedling"></i>
+        <h1>HedApp - ระบบบันทึกข้อมูลการเพาะเห็ด</h1>
+      </div>
+    </header>
+
+    <!-- เมนูหลัก (จอใหญ่จะแสดง, มือถือถูกซ่อน) -->
+    <nav class="main-nav">
+      <ul class="nav-list">
+        <li class="nav-item"><a href="#" class="nav-link" data-page="home"><i class="fa-solid fa-house"></i><span>หน้าแรก</span></a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-page="harvest"><i class="fa-solid fa-weight-hanging"></i><span>บันทึกการเก็บเห็ด</span></a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-page="sales"><i class="fa-solid fa-cart-shopping"></i><span>บันทึกการขาย</span></a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-page="production"><i class="fa-solid fa-boxes-stacked"></i><span>บันทึกผลผลิตก้อนเห็ด</span></a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-page="blooming"><i class="fa-solid fa-seedling"></i><span>บันทึกก้อนเห็ดเปิดดอก</span></a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-page="finance"><i class="fa-solid fa-money-bill-wave"></i><span>บันทึกรายรับ-รายจ่าย</span></a></li>
+        <li class="nav-item"><a href="#" class="nav-link" data-page="summary"><i class="fa-solid fa-chart-pie"></i><span>สรุปภาพรวม</span></a></li>
+      </ul>
+    </nav>
+
+    <main class="main-content">
+      <!-- หน้าแรก -->
+      <section id="home" class="page">
+        <h2 class="page-title"><i class="fa-solid fa-house"></i> หน้าแรก</h2>
+
+        <div class="summary-cards">
+          <div class="summary-card">
+            <h3><i class="fa-solid fa-weight-hanging"></i> เห็ดที่เก็บวันนี้</h3>
+            <div class="value"><span id="today-harvest-kg">0</span> กก.</div>
+          </div>
+          <div class="summary-card">
+            <h3><i class="fa-solid fa-cart-shopping"></i> ยอดขายวันนี้</h3>
+            <div class="value"><span id="today-sales-baht">0</span> บาท</div>
+          </div>
+          <div class="summary-card">
+            <h3><i class="fa-solid fa-seedling"></i> ก้อนเห็ดที่เปิดดอก</h3>
+            <div class="value"><span id="today-blooming-count">0</span> ก้อน</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>ยินดีต้อนรับสู่ HedApp</h3>
+          <p>ระบบบันทึกข้อมูลการเพาะเห็ดแบบครบวงจร (เวอร์ชันนี้เชื่อม API ผ่าน Cloudflare Pages Functions/D1)</p>
+          <p><strong>โดเมน:</strong> hedapp.pages.dev</p>
+          <p><strong>ฐานข้อมูล:</strong> Cloudflare D1 - Myheddb (heddb)</p>
+          <p class="muted">*อย่าลืมผูก D1 Binding ชื่อ <code>DB</code> ให้กับ Pages Functions ของโปรเจกต์นี้</p>
+        </div>
+
+        <div class="card">
+          <h3>การดำเนินการล่าสุด</h3>
+          <div class="table-responsive">
+            <table>
+              <thead><tr><th>วันที่</th><th>กิจกรรม</th><th>รายละเอียด</th></tr></thead>
+              <tbody id="recent-activities">
+                <tr><td colspan="3" class="muted">ยังไม่มีข้อมูล</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- บันทึกการเก็บเห็ด -->
+      <section id="harvest" class="page">
+        <h2 class="page-title"><i class="fa-solid fa-weight-hanging"></i> บันทึกการเก็บเห็ด</h2>
+
+        <div class="card">
+          <h3>แบบฟอร์มบันทึกการเก็บเห็ด</h3>
+          <form id="harvest-form">
+            <div class="form-group">
+              <label for="harvest-date">วัน/เดือน/ปี ที่บันทึก</label>
+              <input type="date" id="harvest-date" class="form-control" required/>
+            </div>
+            <div class="form-group">
+              <label for="mushroom-type">ชนิดเห็ด</label>
+              <select id="mushroom-type" class="form-control" required>
+                <option value="">-- เลือกชนิดเห็ด --</option>
+                <option value="nangfah">เห็ดนางฟ้า</option>
+                <option value="bod">เห็ดบด</option>
+                <option value="khon">เห็ดขอน</option>
+                <option value="other">อื่นๆ</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="harvest-weight">น้ำหนักที่เก็บได้ (กก.)</label>
+              <input type="number" id="harvest-weight" step="0.1" min="0" class="form-control" required/>
+            </div>
+            <button type="submit" class="btn btn-block">บันทึกข้อมูล</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>ประวัติการเก็บเห็ด</h3>
+          <div class="table-responsive">
+            <table>
+              <thead><tr><th>วันที่</th><th>ชนิดเห็ด</th><th>น้ำหนัก (กก.)</th></tr></thead>
+              <tbody id="harvest-table-body">
+                <tr><td colspan="3" class="muted">ยังไม่มีข้อมูล</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>สรุปการเก็บเห็ด</h3>
+          <div class="table-responsive">
+            <table>
+              <thead><tr><th>ชนิดเห็ด</th><th>น้ำหนักรวม (กก.)</th><th>ร้อยละ</th></tr></thead>
+              <tbody id="harvest-summary-body">
+                <tr><td colspan="3" class="muted">ยังไม่มีข้อมูล</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- บันทึกการขาย -->
+      <section id="sales" class="page">
+        <h2 class="page-title"><i class="fa-solid fa-cart-shopping"></i> บันทึกการขาย</h2>
+
+        <div class="card">
+          <h3>แบบฟอร์มบันทึกการขายเห็ด</h3>
+          <form id="sales-form">
+            <div class="form-group">
+              <label for="sales-date">วัน/เดือน/ปี ที่ขาย</label>
+              <input type="date" id="sales-date" class="form-control" required/>
+            </div>
+            <div class="form-group">
+              <label for="sales-mushroom-type">ชนิดเห็ด</label>
+              <select id="sales-mushroom-type" class="form-control" required>
+                <option value="">-- เลือกชนิดเห็ด --</option>
+                <option value="nangfah">เห็ดนางฟ้า</option>
+                <option value="bod">เห็ดบด</option>
+                <option value="khon">เห็ดขอน</option>
+                <option value="other">อื่นๆ</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="sales-weight">น้ำหนักที่ขาย (กก.)</label>
+              <input type="number" id="sales-weight" step="0.1" min="0" class="form-control" required/>
+            </div>
+            <div class="form-group">
+              <label for="sales-price">ราคาขาย (บาท/กก.)</label>
+              <input type="number" id="sales-price" step="0.1" min="0" class="form-control" required/>
+            </div>
+            <button type="submit" class="btn btn-block">บันทึกการขาย</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <h3>ประวัติการขาย</h3>
+          <div class="table-responsive">
+            <table>
+              <thead><tr><th>วันที่</th><th>ชนิดเห็ด</th><th>น้ำหนัก (กก.)</th><th>ราคา (บาท/กก.)</th><th>รวม (บาท)</th></tr></thead>
+              <tbody id="sales-table-body">
+                <tr><td colspan="5" class="muted">ยังไม่มีข้อมูล</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- บันทึกผลผลิตก้อนเห็ด -->
+      <section id="production" class="page">
+        <h2 class="page-title"><i class="fa-solid fa-boxes-stacked"></i> บันทึกผลผลิตก้อนเห็ด</h2>
+        <div class="card">
+          <h3>แบบฟอร์มบันทึกผลผลิตก้อนเห็ด</h3>
+          <form id="production-form">
+            <div class="form-group">
+              <label for="production-date">วัน/เดือน/ปี ที่ผลิต</label>
+              <input type="date" id="production-date" class="form-control" required/>
+            </div>
+            <div class="form-group">
+              <label for="production-mushroom-type">ชนิดเห็ด</label>
+              <select id="production-mushroom-type" class="form-control" required>
+                <option value="">-- เลือกชนิดเห็ด --</option>
+                <option value="nangfah">เห็ดนางฟ้า</option>
+                <option value="bod">เห็ดบด</option>
+                <option value="khon">เห็ดขอน</option>
+                <option value="other">อื่นๆ</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="production-amount">จำนวนก้อนที่ผลิต</label>
+              <input type="number" id="production-amount" min="0" class="form-control" required/>
+            </div>
+            <button type="submit" class="btn btn-block">บันทึกการผลิต</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- บันทึกก้อนเห็ดเปิดดอก -->
+      <section id="blooming" class="page">
+        <h2 class="page-title"><i class="fa-solid fa-seedling"></i> บันทึกก้อนเห็ดเปิดดอก</h2>
+        <div class="card">
+          <h3>แบบฟอร์มบันทึกก้อนเห็ดเปิดดอก</h3>
+          <form id="blooming-form">
+            <div class="form-group">
+              <label for="blooming-date">วัน/เดือน/ปี ที่เปิดดอก</label>
+              <input type="date" id="blooming-date" class="form-control" required/>
+            </div>
+            <div class="form-group">
+              <label for="blooming-mushroom-type">ชนิดเห็ด</label>
+              <select id="blooming-mushroom-type" class="form-control" required>
+                <option value="">-- เลือกชนิดเห็ด --</option>
+                <option value="nangfah">เห็ดนางฟ้า</option>
+                <option value="bod">เห็ดบด</option>
+                <option value="khon">เห็ดขอน</option>
+                <option value="other">อื่นๆ</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="blooming-amount">จำนวนก้อนที่เปิดดอก</label>
+              <input type="number" id="blooming-amount" min="0" class="form-control" required/>
+            </div>
+            <button type="submit" class="btn btn-block">บันทึกการเปิดดอก</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- รายรับ-รายจ่าย -->
+      <section id="finance" class="page">
+        <h2 class="page-title"><i class="fa-solid fa-money-bill-wave"></i> บันทึกรายรับ-รายจ่าย</h2>
+        <div class="card">
+          <h3>แบบฟอร์มบันทึกรายรับ-รายจ่าย</h3>
+          <form id="finance-form">
+            <div class="form-group">
+              <label for="finance-date">วัน/เดือน/ปี</label>
+              <input type="date" id="finance-date" class="form-control" required/>
+            </div>
+            <div class="form-group">
+              <label for="finance-type">ประเภท</label>
+              <select id="finance-type" class="form-control" required>
+                <option value="">-- เลือกประเภท --</option>
+                <option value="income">รายรับ</option>
+                <option value="expense">รายจ่าย</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="finance-amount">จำนวนเงิน (บาท)</label>
+              <input type="number" id="finance-amount" step="0.1" min="0" class="form-control" required/>
+            </div>
+            <div class="form-group">
+              <label for="finance-description">รายละเอียด</label>
+              <input type="text" id="finance-description" class="form-control" required/>
+            </div>
+            <button type="submit" class="btn btn-block">บันทึกรายการ</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- สรุปภาพรวม -->
+      <section id="summary" class="page">
+        <h2 class="page-title"><i class="fa-solid fa-chart-pie"></i> สรุปภาพรวม</h2>
+        <div class="card">
+          <h3>สรุปภาพรวมทั้งหมด</h3>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>รายการ</th>
+                  <th>เห็ดนางฟ้า</th>
+                  <th>เห็ดบด</th>
+                  <th>เห็ดขอน</th>
+                  <th>อื่นๆ</th>
+                  <th>รวม</th>
+                </tr>
+              </thead>
+              <tbody id="overall-summary-body">
+                <tr><td colspan="6" class="muted">ยังไม่มีข้อมูล</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>HedApp - ระบบบันทึกข้อมูลการเพาะเห็ด | พัฒนาโดยใช้ Cloudflare D1 Database</p>
+      <p>โดเมน: hedapp.pages.dev | ฐานข้อมูล: Myheddb (heddb)</p>
+    </footer>
+  </div>
+
+  <!-- แผงเมนูสไลด์ซ้าย + ฉากหลัง -->
+  <div id="menu-overlay" hidden></div>
+  <nav id="menu-panel" role="menu" hidden>
+    <div class="menu-header">เมนู</div>
+    <ul id="menu-list"></ul>
+  </nav>
+
+  <script>
+    // ===== Helpers =====
+    const MUSH = { nangfah:'เห็ดนางฟ้า', bod:'เห็ดบด', khon:'เห็ดขอน', other:'อื่นๆ' };
+    const todayStr = () => new Date().toISOString().split('T')[0];
+    const thaiDate = ymd => { if(!ymd) return ''; const [y,m,d]=ymd.split('-'); return `${d}/${m}/${y}`; };
+    const fmtNum = (n,d=1)=> Number(n||0).toLocaleString('th-TH',{minimumFractionDigits:d,maximumFractionDigits:d});
+    const fmtInt = n => Number(n||0).toLocaleString('th-TH');
+
+    // ===== API endpoints (Cloudflare Pages Functions) =====
+    const API = {
+      harvest: {
+        list: () => fetch('/api/harvest').then(r=>r.json()),
+        add:  (row) => fetch('/api/harvest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)}).then(r=>r.json())
+      },
+      sales: {
+        list: () => fetch('/api/sales').then(r=>r.json()),
+        add:  (row) => fetch('/api/sales',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)}).then(r=>r.json())
+      },
+      production: {
+        add: (row) => fetch('/api/production',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)}).then(r=>r.json())
+      },
+      blooming: {
+        add: (row) => fetch('/api/blooming',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)}).then(r=>r.json())
+      },
+      finance: {
+        add: (row) => fetch('/api/finance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(row)}).then(r=>r.json())
+      },
+      stats: {
+        today:  (date=null) => fetch('/api/stats/today' + (date?`?date=${date}`:'' )).then(r=>r.json()),
+        overall: () => fetch('/api/stats/overall').then(r=>r.json())
+      }
+    };
+
+    // ===== Navigation (ใช้ data-page) =====
+    function setActivePage(id){
+      document.querySelectorAll('.nav-link').forEach(l=>l.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+      document.querySelector(`.nav-link[data-page="${id}"]`)?.classList.add('active');
+      document.getElementById(id)?.classList.add('active');
+      localStorage.setItem('hedapp.activePage', id);
+    }
+    document.querySelectorAll('.nav-link').forEach(link=>{
+      link.addEventListener('click', e=>{
+        e.preventDefault();
+        setActivePage(link.getAttribute('data-page'));
+      });
+    });
+
+    // ===== Renderers =====
+    async function renderHome() {
+      const t = todayStr();
+      try{
+        const data = await API.stats.today(t);
+        document.getElementById('today-harvest-kg').textContent = fmtNum(data?.totals?.kg || 0,1);
+        document.getElementById('today-sales-baht').textContent  = fmtInt(data?.totals?.baht || 0);
+        document.getElementById('today-blooming-count').textContent = fmtInt(data?.totals?.blooming || 0);
+      }catch(e){
+        console.error('today stats error', e);
+      }
+      await renderRecent();
+    }
+
+    async function renderHarvestTable() {
+      try{
+        const rows = await API.harvest.list();
+        const tb = document.getElementById('harvest-table-body');
+        tb.innerHTML = rows.length ? rows
+          .map(h=>`<tr><td>${thaiDate(h.date)}</td><td>${MUSH[h.type]||'-'}</td><td>${fmtNum(h.weight,1)}</td></tr>`).join('')
+          : `<tr><td colspan="3" class="muted">ยังไม่มีข้อมูล</td></tr>`;
+      }catch(e){
+        console.error('harvest list error', e);
+      }
+    }
+
+    async function renderSalesTable() {
+      try{
+        const rows = await API.sales.list();
+        const tb = document.getElementById('sales-table-body');
+        tb.innerHTML = rows.length ? rows
+          .map(s=>`<tr>
+            <td>${thaiDate(s.date)}</td>
+            <td>${MUSH[s.type]||'-'}</td>
+            <td>${fmtNum(s.weight,1)}</td>
+            <td>${fmtNum(s.price,1)}</td>
+            <td>${fmtInt(s.total ?? ((+s.weight||0)*(+s.price||0)))}</td>
+          </tr>`).join('')
+          : `<tr><td colspan="5" class="muted">ยังไม่มีข้อมูล</td></tr>`;
+      }catch(e){
+        console.error('sales list error', e);
+      }
+    }
+
+    async function renderHarvestSummary() {
+      try{
+        const rows = await API.harvest.list();
+        const acc = {nangfah:0,bod:0,khon:0,other:0};
+        rows.forEach(h=>acc[h.type]=(acc[h.type]||0)+(+h.weight||0));
+        const total = Object.values(acc).reduce((a,b)=>a+b,0);
+        const body = document.getElementById('harvest-summary-body');
+        if (!total) { body.innerHTML = `<tr><td colspan="3" class="muted">ยังไม่มีข้อมูล</td></tr>`; return; }
+        const lines = Object.keys(MUSH).map(k=>{
+          const w = acc[k]||0, pct = total?Math.round(w*100/total):0;
+          return `<tr><td>${MUSH[k]}</td><td>${fmtNum(w,1)}</td><td>${pct}%</td></tr>`;
+        }).join('');
+        body.innerHTML = lines + `<tr><th>ทั้งหมด</th><th>${fmtNum(total,1)}</th><th>100%</th></tr>`;
+      }catch(e){
+        console.error('harvest summary error', e);
+      }
+    }
+
+    async function renderOverall() {
+      try{
+        const data = await API.stats.overall();
+        const K = ['nangfah','bod','khon','other'];
+        const mapRes = (arr, key) => {
+          const m = {nangfah:0,bod:0,khon:0,other:0};
+          (arr||[]).forEach(x=>{ if (x && x.type in m) m[x.type] = x[key] || 0; });
+          return m;
+        };
+        const weight   = mapRes(data.harvest,'kg');
+        const sales    = mapRes(data.sales,'baht');
+        const produced = mapRes(data.production,'count');
+        const opened   = mapRes(data.blooming,'count');
+        const sum = o => Object.values(o).reduce((a,b)=>a+(+b||0),0);
+
+        const row = (label, obj, fmt, total) =>
+          `<tr><td>${label}</td>${K.map(k=>`<td>${fmt(obj[k])}</td>`).join('')}<td>${fmt(total)}</td></tr>`;
+
+        const body = document.getElementById('overall-summary-body');
+        if (!(sum(weight)||sum(sales)||sum(produced)||sum(opened))) {
+          body.innerHTML = `<tr><td colspan="6" class="muted">ยังไม่มีข้อมูล</td></tr>`;
+          return;
+        }
+        body.innerHTML = [
+          row('น้ำหนักที่เก็บได้ (กก.)', weight, x=>fmtNum(x,1), sum(weight)),
+          row('ยอดขาย (บาท)',         sales,  x=>fmtInt(x),    sum(sales)),
+          row('ก้อนที่ผลิต',           produced, x=>fmtInt(x),  sum(produced)),
+          row('ก้อนที่เปิดดอก',       opened,   x=>fmtInt(x),  sum(opened)),
+        ].join('');
+      }catch(e){
+        console.error('overall error', e);
+      }
+    }
+
+    async function renderRecent() {
+      try{
+        const [H,S] = await Promise.all([API.harvest.list(), API.sales.list()]);
+        const box = document.getElementById('recent-activities');
+        const evts = [];
+        H.slice(0,5).forEach(h=>evts.push({date:h.date, act:'บันทึกการเก็บเห็ด', detail:`${MUSH[h.type]} ${fmtNum(h.weight,1)} กก.`}));
+        S.slice(0,5).forEach(s=>evts.push({date:s.date, act:'บันทึกการขาย', detail:`${MUSH[s.type]} ${fmtNum(s.weight,1)} กก. = ${fmtInt((+s.weight||0)*(+s.price||0))} บาท`}));
+        evts.sort((a,b)=>b.date.localeCompare(a.date));
+        box.innerHTML = evts.length ? evts.slice(0,8).map(e=>`<tr><td>${thaiDate(e.date)}</td><td>${e.act}</td><td>${e.detail}</td></tr>`).join('')
+          : `<tr><td colspan="3" class="muted">ยังไม่มีข้อมูล</td></tr>`;
+      }catch(e){
+        console.error('recent error', e);
+      }
+    }
+
+    // ===== Forms (POST) =====
+    function preventDoubleSubmit(e){ const btn = e.submitter; if(btn){ btn.disabled = true; setTimeout(()=>btn.disabled=false, 900); } }
+
+    document.getElementById('harvest-form').addEventListener('submit', async e=>{
+      e.preventDefault(); preventDoubleSubmit(e);
+      const date = document.getElementById('harvest-date').value || todayStr();
+      const type = document.getElementById('mushroom-type').value;
+      const weight = parseFloat(document.getElementById('harvest-weight').value);
+      await API.harvest.add({ date, type, weight });
+      e.target.reset(); document.getElementById('harvest-date').value = todayStr();
+      alert('บันทึกการเก็บเห็ดเรียบร้อยแล้ว!');
+      await renderHarvestTable(); await renderHarvestSummary(); await renderHome(); await renderOverall();
+    });
+
+    document.getElementById('sales-form').addEventListener('submit', async e=>{
+      e.preventDefault(); preventDoubleSubmit(e);
+      const date = document.getElementById('sales-date').value || todayStr();
+      const type = document.getElementById('sales-mushroom-type').value;
+      const weight = parseFloat(document.getElementById('sales-weight').value);
+      const price = parseFloat(document.getElementById('sales-price').value);
+      await API.sales.add({ date, type, weight, price });
+      e.target.reset(); document.getElementById('sales-date').value = todayStr();
+      alert('บันทึกการขายเรียบร้อยแล้ว!');
+      await renderSalesTable(); await renderHome(); await renderOverall();
+    });
+
+    document.getElementById('production-form').addEventListener('submit', async e=>{
+      e.preventDefault(); preventDoubleSubmit(e);
+      const date = document.getElementById('production-date').value || todayStr();
+      const type = document.getElementById('production-mushroom-type').value;
+      const amount = parseInt(document.getElementById('production-amount').value,10);
+      await API.production.add({ date, type, amount });
+      e.target.reset(); document.getElementById('production-date').value = todayStr();
+      alert('บันทึกการผลิตก้อนเห็ดเรียบร้อยแล้ว!');
+      await renderOverall(); await renderHome();
+    });
+
+    document.getElementById('blooming-form').addEventListener('submit', async e=>{
+      e.preventDefault(); preventDoubleSubmit(e);
+      const date = document.getElementById('blooming-date').value || todayStr();
+      const type = document.getElementById('blooming-mushroom-type').value;
+      const amount = parseInt(document.getElementById('blooming-amount').value,10);
+      await API.blooming.add({ date, type, amount });
+      e.target.reset(); document.getElementById('blooming-date').value = todayStr();
+      alert('บันทึกการเปิดดอกเรียบร้อยแล้ว!');
+      await renderOverall(); await renderHome();
+    });
+
+    document.getElementById('finance-form').addEventListener('submit', async e=>{
+      e.preventDefault(); preventDoubleSubmit(e);
+      const date = document.getElementById('finance-date').value || todayStr();
+      const kind = document.getElementById('finance-type').value;
+      const amount = parseFloat(document.getElementById('finance-amount').value);
+      const description = document.getElementById('finance-description').value.trim();
+      await API.finance.add({ date, kind, amount, description });
+      e.target.reset(); document.getElementById('finance-date').value = todayStr();
+      alert('บันทึกรายรับ-รายจ่ายเรียบร้อยแล้ว!');
+      await renderHome();
+    });
+
+    // ===== Hamburger Drawer =====
+    const $trigger = document.querySelector('.menu-trigger');
+    const $overlay = document.getElementById('menu-overlay');
+    const $panel   = document.getElementById('menu-panel');
+    const $list    = document.getElementById('menu-list');
+
+    function buildMenuFromNav(){
+      if (!$list) return;
+      $list.innerHTML = '';
+      document.querySelectorAll('.nav-link').forEach(link=>{
+        const page  = link.getAttribute('data-page');
+        const icon  = link.querySelector('i')?.className || 'fa-solid fa-circle';
+        const label = link.querySelector('span')?.textContent?.trim() || page;
+
+        const li  = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('role','menuitem');
+        btn.dataset.page = page;
+        btn.innerHTML = `<i class="${icon}"></i><span>${label}</span>`;
+
+        if (link.classList.contains('active')) btn.classList.add('active');
+
+        btn.addEventListener('click', ()=>{
+          if (typeof setActivePage === 'function') setActivePage(page);
+          else document.querySelector(`.nav-link[data-page="${page}"]`)?.click();
+          closeMenu();
+        });
+
+        li.appendChild(btn);
+        $list.appendChild(li);
+      });
+    }
+    function openMenu(){
+      buildMenuFromNav();
+      $overlay.hidden = false; $panel.hidden = false;
+      requestAnimationFrame(()=>{
+        $overlay.classList.add('show'); $panel.classList.add('open');
+      });
+      $trigger?.setAttribute('aria-expanded','true');
+      setTimeout(()=> $list.querySelector('button')?.focus(), 10);
+      document.addEventListener('keydown', onKey);
+    }
+    function closeMenu(){
+      $overlay.classList.remove('show'); $panel.classList.remove('open');
+      $trigger?.setAttribute('aria-expanded','false');
+      setTimeout(()=>{ $overlay.hidden = true; $panel.hidden = true; $trigger?.focus(); }, 240);
+      document.removeEventListener('keydown', onKey);
+    }
+    function onKey(e){ if (e.key === 'Escape') closeMenu(); }
+
+    $trigger?.addEventListener('click', e=>{
+      e.preventDefault();
+      const open = $panel && $panel.classList.contains('open');
+      open ? closeMenu() : openMenu();
+    });
+    $overlay?.addEventListener('click', closeMenu);
+
+    // sync active เมื่อสลับแท็บจากที่อื่น ขณะ drawer เปิดอยู่
+    const navObserver = new MutationObserver(()=>{
+      if ($panel?.hidden) return;
+      const activePage = document.querySelector('.nav-link.active')?.getAttribute('data-page');
+      $list.querySelectorAll('button').forEach(b=>{
+        b.classList.toggle('active', b.dataset.page === activePage);
+      });
+    });
+    navObserver.observe(document.body, { subtree:true, attributes:true, attributeFilter:['class'] });
+
+    // ===== Init =====
+    // set default dates
+    ['harvest-date','sales-date','production-date','blooming-date','finance-date'].forEach(id=>{
+      const el = document.getElementById(id); if(el) el.value = todayStr();
+    });
+    // open last page or home
+    const start = localStorage.getItem('hedapp.activePage') || 'home';
+    setActivePage(start);
+
+    // initial render
+    (async () => {
+      await Promise.all([
+        renderHome(),
+        renderHarvestTable(),
+        renderHarvestSummary(),
+        renderSalesTable(),
+        renderOverall()
+      ]);
+    })();
+  </script>
+</body>
+</html>
