@@ -1,39 +1,39 @@
 import { ensureSchema, corsHeaders, json } from '../../_lib/schema.js';
-
 export const onRequestOptions = ({ request }) => new Response(null, { headers: corsHeaders(request) });
 
 export async function onRequest({ request, env }) {
   const headers = corsHeaders(request);
-  await ensureSchema(env.DB);
+  if (!env.DB) return json({ ok:false, error:"D1 binding 'DB' missing" }, { status:500, headers });
 
-  const url = new URL(request.url);
-  const date = url.searchParams.get('date') || new Date().toISOString().split('T')[0];
+  try {
+    await ensureSchema(env.DB);
 
-  // harvest: kg per type
-  const h = await env.DB.prepare(
-    `SELECT type, SUM(weight) AS kg FROM harvest WHERE date = ?1 GROUP BY type`
-  ).bind(date).all();
+    const url = new URL(request.url);
+    const date = url.searchParams.get('date') || new Date().toISOString().split('T')[0];
 
-  // sales: baht per type
-  const s = await env.DB.prepare(
-    `SELECT type, SUM(weight * price) AS baht FROM sales WHERE date = ?1 GROUP BY type`
-  ).bind(date).all();
+    const h = await env.DB.prepare(
+      `SELECT type, SUM(weight) AS kg FROM harvest WHERE date=?1 GROUP BY type`
+    ).bind(date).all();
 
-  // blooming: count per type
-  const b = await env.DB.prepare(
-    `SELECT type, SUM(amount) AS count FROM blooming WHERE date = ?1 GROUP BY type`
-  ).bind(date).all();
+    const s = await env.DB.prepare(
+      `SELECT type, SUM(weight*price) AS baht FROM sales WHERE date=?1 GROUP BY type`
+    ).bind(date).all();
 
-  // totals
-  const totalKg = (h.results||[]).reduce((a,x)=>a+(x.kg||0),0);
-  const totalBaht = (s.results||[]).reduce((a,x)=>a+(x.baht||0),0);
-  const totalBloom = (b.results||[]).reduce((a,x)=>a+(x.count||0),0);
+    const b = await env.DB.prepare(
+      `SELECT type, SUM(amount) AS count FROM blooming WHERE date=?1 GROUP BY type`
+    ).bind(date).all();
 
-  return json({
-    date,
-    harvest: h.results || [],
-    sales: s.results || [],
-    blooming: b.results || [],
-    totals: { kg: totalKg, baht: totalBaht, blooming: totalBloom }
-  }, { headers });
+    const sum = (rows, k) => (rows?.results||[]).reduce((a,x)=>a+(x[k]||0),0);
+
+    return json({
+      ok:true,
+      date,
+      harvest: h.results || [],
+      sales:   s.results || [],
+      blooming:b.results || [],
+      totals: { kg: sum(h,'kg'), baht: sum(s,'baht'), blooming: sum(b,'count') }
+    }, { headers });
+  } catch (e) {
+    return json({ ok:false, error:String(e) }, { status:500, headers });
+  }
 }
