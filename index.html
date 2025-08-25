@@ -387,7 +387,6 @@
                 </tr>
               </thead>
               <tbody id="overall-summary-body">
-                <tr><td colspan="6" class="muted">ยังไม่มีข้อมูล</td></tr>
               </tbody>
             </table>
           </div>
@@ -715,5 +714,66 @@
       ]);
     })();
   </script>
+  <script>
+// ===== สรุปภาพรวม =====
+const types = ['nangfah','bod','khon','other'];
+const sumFmt1 = n => Number(n||0).toLocaleString('th-TH',{maximumFractionDigits:1});
+const sumFmt0 = n => Number(n||0).toLocaleString('th-TH');
+const num = (o,k) => (o && !isNaN(+o[k])) ? +o[k] : 0;
+
+async function loadOverallSummary(){
+  const tbody = document.getElementById('overall-summary-body');
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="6" class="muted">กำลังโหลด…</td></tr>`;
+
+  try{
+    const res = await fetch('/api/stats/overall');
+    const data = await res.json();
+    if (!data.ok) { tbody.innerHTML = `<tr><td colspan="6" class="muted">โหลดไม่สำเร็จ</td></tr>`; return; }
+
+    // สะสมยอดตามชนิด
+    const sums = {
+      harvest: Object.fromEntries(types.map(t=>[t,0])),
+      sales: Object.fromEntries(types.map(t=>[t,0])),
+      production: Object.fromEntries(types.map(t=>[t,0])),
+      blooming: Object.fromEntries(types.map(t=>[t,0])),
+    };
+    (data.harvest||[]).forEach(x => sums.harvest[x.type]    += num(x,'weight'));
+    (data.sales||[]).forEach(x   => sums.sales[x.type]      += num(x,'weight') * num(x,'price'));
+    (data.production||[]).forEach(x => sums.production[x.type] += num(x,'amount'));
+    (data.blooming||[]).forEach(x   => sums.blooming[x.type]   += num(x,'amount'));
+
+    const row = (label, key, fmt) => {
+      const cells = types.map(t=>`<td>${fmt(sums[key][t])}</td>`).join('');
+      const total = types.reduce((s,t)=> s + sums[key][t], 0);
+      return `<tr><td>${label}</td>${cells}<td>${fmt(total)}</td></tr>`;
+    };
+
+    tbody.innerHTML =
+      row('น้ำหนักที่เก็บได้ (กก.)', 'harvest',   sumFmt1) +
+      row('ยอดขาย (บาท)',           'sales',     sumFmt0) +
+      row('ก้อนที่ผลิต',             'production',sumFmt0) +
+      row('ก้อนที่เปิดดอก',          'blooming',  sumFmt0);
+  }catch(err){
+    tbody.innerHTML = `<tr><td colspan="6" class="muted">ผิดพลาด: ${err}</td></tr>`;
+  }
+}
+
+// ให้โหลดทุกครั้งที่เปิดแท็บ "สรุปภาพรวม"
+document.querySelectorAll('.nav-link').forEach(link=>{
+  link.addEventListener('click', (e)=>{
+    const pageId = link.getAttribute('data-page');
+    if (pageId === 'summary') loadOverallSummary();
+  });
+});
+
+// ถ้าเปิดมาที่สรุปอยู่แล้ว ให้โหลดทันที
+document.addEventListener('DOMContentLoaded', ()=>{
+  if (document.getElementById('summary')?.classList.contains('active')) {
+    loadOverallSummary();
+  }
+});
+</script>
+
 </body>
 </html>
