@@ -160,52 +160,75 @@
         </div>
 
         <!-- วางไว้ในหน้าแรกตำแหน่งที่อยากให้โชว์ -->
-<div class="card">
-  <h3>ราคากลางเห็ด (อัปเดตอัตโนมัติ)</h3>
-  <div id="market-body">กำลังโหลดข้อมูล...</div>
+<div class="card" id="market-card">
+  <h3>ราคาตลาดกลาง</h3>
+  <div id="market-updated" class="muted"></div>
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          <th>ชนิดเห็ด</th>
+          <th>พื้นที่</th>
+          <th>ต่ำสุด</th>
+          <th>สูงสุด</th>
+          <th>เฉลี่ย</th>
+        </tr>
+      </thead>
+      <tbody id="market-body">
+        <tr><td colspan="5" class="muted">กำลังโหลด...</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
-
 <script>
-(async () => {
-  const box = document.getElementById('market-body');
+async function loadMarket() {
+  const bodyEl = document.getElementById('market-body');
+  const updEl  = document.getElementById('market-updated');
+  if (!bodyEl) return;
+
+  bodyEl.innerHTML = `<tr><td colspan="5" class="muted">กำลังโหลด...</td></tr>`;
+  updEl.textContent = '';
+
   try {
     const r = await fetch('/api/market');
     const data = await r.json();
-    if (!data.ok) { box.textContent = 'โหลดข้อมูลล้มเหลว: ' + data.error; return; }
 
-    if (!data.items.length) { box.textContent = 'ยังไม่มีข้อมูล'; return; }
+    if (!data.ok) throw new Error(data.error || 'โหลดข้อมูลล้มเหลว');
 
-    // สร้างตารางสวย ๆ
-    const table = document.createElement('table');
-    table.innerHTML = `
-      <thead>
-        <tr>
-          <th>ชนิดเห็ด</th><th>ต่ำ (บ./กก.)</th><th>สูง (บ./กก.)</th>
-          <th>เฉลี่ย</th><th>พื้นที่</th><th>อัปเดตเมื่อ</th>
-        </tr>
-      </thead>
-      <tbody></tbody>`;
-    const tb = table.querySelector('tbody');
+    // แปลงรหัสชนิดเห็ดเป็นชื่อไทย
+    const mapName = {
+      nangfah: 'เห็ดนางฟ้า',
+      bod:     'เห็ดบด',
+      khon:    'เห็ดขอน',
+      other:   'อื่นๆ'
+    };
 
-    const nameMap = { nangfah:'เห็ดนางฟ้า', bod:'เห็ดบด', khon:'เห็ดขอน', other:'อื่น ๆ' };
-
-    for (const it of data.items) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${nameMap[it.type] ?? it.type}</td>
-        <td>${it.low}</td>
-        <td>${it.high}</td>
-        <td>${it.avg.toFixed(1)}</td>
+    const rows = data.items.map(it => `
+      <tr>
+        <td>${mapName[it.type] || it.type || '-'}</td>
         <td>${it.area || '-'}</td>
-        <td>${it.updated_at || '-'}</td>`;
-      tb.appendChild(tr);
-    }
-    box.replaceChildren(table);
+        <td>${Number(it.low  || 0).toLocaleString()}</td>
+        <td>${Number(it.high || 0).toLocaleString()}</td>
+        <td>${Number(it.avg  || 0).toLocaleString()}</td>
+      </tr>
+    `).join('');
+
+    bodyEl.innerHTML = rows || `<tr><td colspan="5" class="muted">ยังไม่มีข้อมูล</td></tr>`;
+    if (data.updated_at) updEl.textContent = `อัปเดตล่าสุด: ${data.updated_at}`;
   } catch (e) {
-    box.textContent = 'เกิดข้อผิดพลาด: ' + e;
+    bodyEl.innerHTML = `<tr><td colspan="5" class="muted">ผิดพลาด: ${e.message}</td></tr>`;
   }
-})();
+}
+
+// โหลดเมื่อเปิดหน้า
+document.addEventListener('DOMContentLoaded', loadMarket);
+
+// ถ้าคุณมีระบบเปลี่ยนแท็บหน้า (คลิกเมนูแล้วโชว์/ซ่อน section) และอยากให้รีโหลดทุกครั้งที่กลับมาหน้าแรก
+// เรียก loadMarket() ตอนสลับมาหน้า home ได้เช่นกัน
 </script>
+
+
+
 
 
         <div class="card">
