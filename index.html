@@ -161,14 +161,51 @@
 
         <!-- วางไว้ในหน้าแรกตำแหน่งที่อยากให้โชว์ -->
 <div class="card">
-  <h3><i class="fas fa-tags"></i> ราคาเห็ดตลาดกลาง</h3>
-  <iframe
-    src="https://docs.google.com/spreadsheets/d/e/2PACX-1vRSg8Cg8NQpto-aPqk-KP6N4PTKlBlL4V3V6UzeQDuaZGpO9eH5Ts18iR1tFfYFIm8gLN7maFm8glBz/pubhtml?gid=0&single=true"
-    style="width:100%; height:450px; border:0;"
-    loading="lazy"
-  ></iframe>
-  <p class="muted">ข้อมูลจาก Google Sheets (ฝังแบบอ่านอย่างเดียว)</p>
+  <h3>ราคากลางเห็ด (อัปเดตอัตโนมัติ)</h3>
+  <div id="market-body">กำลังโหลดข้อมูล...</div>
 </div>
+
+<script>
+(async () => {
+  const box = document.getElementById('market-body');
+  try {
+    const r = await fetch('/api/market');
+    const data = await r.json();
+    if (!data.ok) { box.textContent = 'โหลดข้อมูลล้มเหลว: ' + data.error; return; }
+
+    if (!data.items.length) { box.textContent = 'ยังไม่มีข้อมูล'; return; }
+
+    // สร้างตารางสวย ๆ
+    const table = document.createElement('table');
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th>ชนิดเห็ด</th><th>ต่ำ (บ./กก.)</th><th>สูง (บ./กก.)</th>
+          <th>เฉลี่ย</th><th>พื้นที่</th><th>อัปเดตเมื่อ</th>
+        </tr>
+      </thead>
+      <tbody></tbody>`;
+    const tb = table.querySelector('tbody');
+
+    const nameMap = { nangfah:'เห็ดนางฟ้า', bod:'เห็ดบด', khon:'เห็ดขอน', other:'อื่น ๆ' };
+
+    for (const it of data.items) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${nameMap[it.type] ?? it.type}</td>
+        <td>${it.low}</td>
+        <td>${it.high}</td>
+        <td>${it.avg.toFixed(1)}</td>
+        <td>${it.area || '-'}</td>
+        <td>${it.updated_at || '-'}</td>`;
+      tb.appendChild(tr);
+    }
+    box.replaceChildren(table);
+  } catch (e) {
+    box.textContent = 'เกิดข้อผิดพลาด: ' + e;
+  }
+})();
+</script>
 
 
         <div class="card">
