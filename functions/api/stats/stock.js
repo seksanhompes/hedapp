@@ -12,11 +12,11 @@ export async function onRequest({ env, request }) {
   const bindType   = type === 'all' ? [] : [type];
 
   try {
-    // ดึงทุกคอลัมน์ออกมา แล้วไปคำนวณน้ำหนักใน JS (เลี่ยงการอ้างคอลัมน์ที่ไม่มี)
     const hRes = await DB
       .prepare(`SELECT * FROM harvest WHERE date BETWEEN ? AND ? ${typeFilter}`)
       .bind(...bindCommon, ...bindType)
       .all();
+
     const sRes = await DB
       .prepare(`SELECT * FROM sales   WHERE date BETWEEN ? AND ? ${typeFilter}`)
       .bind(...bindCommon, ...bindType)
@@ -25,23 +25,18 @@ export async function onRequest({ env, request }) {
     const hRows = hRes.results || [];
     const sRows = sRes.results || [];
 
-    // ฟังก์ชันอ่านน้ำหนักจากฟิลด์ที่มีจริงในแถว
-    const getWeight = (row) => {
-      // ใส่ลำดับความสำคัญตามที่ตารางคุณมีจริง
-      return Number(
-        (row.weight ?? row.weight_kg ?? row.total_weight ?? 0)
-      ) || 0;
-    };
+    // ฟังก์ชันดึงน้ำหนักจากฟิลด์ที่มีจริงในตารางคุณ
+    const getWeight = (row) => Number(
+      (row.weight ?? row.weight_kg ?? row.total_weight ?? 0)
+    ) || 0;
     const getType = (row) => String(row.type || 'other').toLowerCase();
 
-    // รวม harvest
     const mapH = Object.create(null);
     for (const r of hRows) {
       const t = getType(r);
       mapH[t] = (mapH[t] || 0) + getWeight(r);
     }
 
-    // รวม sales
     const mapS = Object.create(null);
     for (const r of sRows) {
       const t = getType(r);
@@ -53,12 +48,7 @@ export async function onRequest({ env, request }) {
       const by_type = [...allTypes].map(t => {
         const h = mapH[t] || 0;
         const s = mapS[t] || 0;
-        return {
-          t,
-          harvest_weight: h,
-          sales_weight: s,
-          remain_weight: h - s
-        };
+        return { t, harvest_weight: h, sales_weight: s, remain_weight: h - s };
       }).sort((a,b) => a.t.localeCompare(b.t));
 
       const totals = by_type.reduce((acc, r) => {
@@ -68,60 +58,14 @@ export async function onRequest({ env, request }) {
         return acc;
       }, { harvest_weight:0, sales_weight:0, remain_weight:0 });
 
-      return json({ ok:true, from, to, type, totals, by_type });
+      return json({ ok:true, debug:'v2', from, to, type, totals, by_type });
     } else {
       const t = type;
       const h = mapH[t] || 0;
       const s = mapS[t] || 0;
       const totals = { harvest_weight: h, sales_weight: s, remain_weight: h - s };
-      return json({ ok:true, from, to, type, totals });
+      return json({ ok:true, debug:'v2', from, to, type, totals });
     }
-  } catch (e) {
-    return json({ ok:false, error:`${e}` }, 500);
-  }
-
-  function json(payload, status = 200) {
-    return new Response(JSON.stringify(payload), {
-      status,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
-}    const mapH = Object.create(null);
-    hRows.forEach(r => mapH[r.t || 'other'] = Number(r.harvest_weight || 0));
-
-    const mapS = Object.create(null);
-    sRows.forEach(r => mapS[r.t || 'other'] = Number(r.sales_weight || 0));
-
-    // รวมแบบ all types
-    if (type === 'all') {
-      const allTypes = new Set([...Object.keys(mapH), ...Object.keys(mapS)]);
-      const by_type = [...allTypes].map(t => {
-        const h = mapH[t] || 0;
-        const s = mapS[t] || 0;
-        return {
-          t,
-          harvest_weight: h,
-          sales_weight: s,
-          remain_weight: h - s
-        };
-      }).sort((a,b) => a.t.localeCompare(b.t));
-
-      const totals = by_type.reduce((acc, r) => {
-        acc.harvest_weight += r.harvest_weight;
-        acc.sales_weight   += r.sales_weight;
-        acc.remain_weight  += r.remain_weight;
-        return acc;
-      }, { harvest_weight:0, sales_weight:0, remain_weight:0 });
-
-      return json({ ok:true, from, to, type, totals, by_type });
-    }
-
-    // กรณีเลือกชนิดเดียว
-    const t = type;
-    const h = mapH[t] || 0;
-    const s = mapS[t] || 0;
-    const totals = { harvest_weight: h, sales_weight: s, remain_weight: h - s };
-    return json({ ok:true, from, to, type, totals });
   } catch (e) {
     return json({ ok:false, error:String(e) }, 500);
   }
@@ -132,4 +76,4 @@ export async function onRequest({ env, request }) {
       headers: { 'Content-Type': 'application/json' }
     });
   }
-          }
+}
