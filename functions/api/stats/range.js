@@ -1,4 +1,4 @@
-// สรุปตามช่วงวันที่ + ชนิดเห็ด
+// /functions/api/stats/range.js
 export async function onRequest({ env, request }) {
   const { DB } = env;
   const url = new URL(request.url);
@@ -7,15 +7,14 @@ export async function onRequest({ env, request }) {
   const to   = url.searchParams.get('to')   || '2999-12-31';
   const type = (url.searchParams.get('type') || 'all').toLowerCase(); // all | nangfah | bod | khon | other
 
-  const typeFilter = type === 'all' ? '' : 'AND LOWER(COALESCE(type, mushroom_type)) = ?';
+  const typeFilter = type === 'all' ? '' : 'AND LOWER(type) = ?';
   const bindCommon = [from, to];
   const bindType   = type === 'all' ? [] : [type];
 
   try {
     // เก็บเห็ด (น้ำหนักรวม)
     const hRes = await DB.prepare(
-      `SELECT COALESCE(type, mushroom_type) AS t,
-              SUM(COALESCE(weight, weight_kg, 0)) AS weight
+      `SELECT type AS t, SUM(COALESCE(weight,0)) AS weight
          FROM harvest
         WHERE date BETWEEN ? AND ?
         ${typeFilter}
@@ -23,14 +22,11 @@ export async function onRequest({ env, request }) {
     ).bind(...bindCommon, ...bindType).all();
     const hRows = hRes.results || [];
 
-    // ขายเห็ด (น้ำหนัก + ยอดเงิน)
+    // ขายเห็ด (น้ำหนัก + ยอดเงิน)  — ใช้ weight และ price ตามสคีมาปัจจุบัน
     const sRes = await DB.prepare(
-      `SELECT COALESCE(type, mushroom_type) AS t,
-              SUM(COALESCE(weight, weight_kg, 0)) AS sales_weight,
-              SUM(
-                COALESCE(total, total_amount,
-                         COALESCE(weight, weight_kg, 0) * COALESCE(price, price_per_kg, 0))
-              ) AS sales_amount
+      `SELECT type AS t,
+              SUM(COALESCE(weight,0)) AS sales_weight,
+              SUM(COALESCE(weight,0) * COALESCE(price,0)) AS sales_amount
          FROM sales
         WHERE date BETWEEN ? AND ?
         ${typeFilter}
@@ -40,7 +36,7 @@ export async function onRequest({ env, request }) {
 
     // ผลิตก้อน
     const pRow = (await DB.prepare(
-      `SELECT SUM(COALESCE(amount, quantity, 0)) AS amount
+      `SELECT SUM(COALESCE(amount,0)) AS amount
          FROM production
         WHERE date BETWEEN ? AND ?
         ${typeFilter}`
@@ -48,7 +44,7 @@ export async function onRequest({ env, request }) {
 
     // เปิดดอก
     const bRow = (await DB.prepare(
-      `SELECT SUM(COALESCE(amount, quantity, 0)) AS amount
+      `SELECT SUM(COALESCE(amount,0)) AS amount
          FROM blooming
         WHERE date BETWEEN ? AND ?
         ${typeFilter}`
@@ -67,7 +63,7 @@ export async function onRequest({ env, request }) {
       blooming_blocks: Number(bRow.amount || 0),
     };
 
-    // รายการแยกตามชนิด (ไว้ใช้ตอนเลือก type=all)
+    // รายการแยกตามชนิด (เฉพาะตอน type=all)
     let by_type = null;
     if (type === 'all') {
       const map = {};
