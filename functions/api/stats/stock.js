@@ -7,34 +7,86 @@ export async function onRequest({ env, request }) {
   const to   = url.searchParams.get('to')   || '2999-12-31';
   const type = (url.searchParams.get('type') || 'all').toLowerCase();
 
-  const typeFilter = type === 'all' ? '' : 'AND LOWER(COALESCE(type, mushroom_type)) = ?';
+  const typeFilter = type === 'all' ? '' : 'AND LOWER(type) = ?';
   const bindCommon = [from, to];
   const bindType   = type === 'all' ? [] : [type];
 
   try {
-    // รวม "เก็บ" ตามช่วงวัน
-    const hRes = await DB.prepare(
-      `SELECT LOWER(COALESCE(type, mushroom_type)) AS t,
-              SUM(COALESCE(weight, weight_kg, 0)) AS harvest_weight
-         FROM harvest
-        WHERE date BETWEEN ? AND ?
-        ${typeFilter}
-        GROUP BY ${type === 'all' ? 't' : '1'}`
-    ).bind(...bindCommon, ...bindType).all();
-    const hRows = hRes.results || [];
+    // ดึงทุกคอลัมน์ออกมา แล้วไปคำนวณน้ำหนักใน JS (เลี่ยงการอ้างคอลัมน์ที่ไม่มี)
+    const hRes = await DB
+      .prepare(`SELECT * FROM harvest WHERE date BETWEEN ? AND ? ${typeFilter}`)
+      .bind(...bindCommon, ...bindType)
+      .all();
+    const sRes = await DB
+      .prepare(`SELECT * FROM sales   WHERE date BETWEEN ? AND ? ${typeFilter}`)
+      .bind(...bindCommon, ...bindType)
+      .all();
 
-    // รวม "ขาย" ตามช่วงวัน
-    const sRes = await DB.prepare(
-      `SELECT LOWER(COALESCE(type, mushroom_type)) AS t,
-              SUM(COALESCE(weight, weight_kg, 0)) AS sales_weight
-         FROM sales
-        WHERE date BETWEEN ? AND ?
-        ${typeFilter}
-        GROUP BY ${type === 'all' ? 't' : '1'}`
-    ).bind(...bindCommon, ...bindType).all();
+    const hRows = hRes.results || [];
     const sRows = sRes.results || [];
 
+    // ฟังก์ชันอ่านน้ำหนักจากฟิลด์ที่มีจริงในแถว
+    const getWeight = (row) => {
+      // ใส่ลำดับความสำคัญตามที่ตารางคุณมีจริง
+      return Number(
+        (row.weight ?? row.weight_kg ?? row.total_weight ?? 0)
+      ) || 0;
+    };
+    const getType = (row) => String(row.type || 'other').toLowerCase();
+
+    // รวม harvest
     const mapH = Object.create(null);
+    for (const r of hRows) {
+      const t = getType(r);
+      mapH[t] = (mapH[t] || 0) + getWeight(r);
+    }
+
+    // รวม sales
+    const mapS = Object.create(null);
+    for (const r of sRows) {
+      const t = getType(r);
+      mapS[t] = (mapS[t] || 0) + getWeight(r);
+    }
+
+    if (type === 'all') {
+      const allTypes = new Set([...Object.keys(mapH), ...Object.keys(mapS)]);
+      const by_type = [...allTypes].map(t => {
+        const h = mapH[t] || 0;
+        const s = mapS[t] || 0;
+        return {
+          t,
+          harvest_weight: h,
+          sales_weight: s,
+          remain_weight: h - s
+        };
+      }).sort((a,b) => a.t.localeCompare(b.t));
+
+      const totals = by_type.reduce((acc, r) => {
+        acc.harvest_weight += r.harvest_weight;
+        acc.sales_weight   += r.sales_weight;
+        acc.remain_weight  += r.remain_weight;
+        return acc;
+      }, { harvest_weight:0, sales_weight:0, remain_weight:0 });
+
+      return json({ ok:true, from, to, type, totals, by_type });
+    } else {
+      const t = type;
+      const h = mapH[t] || 0;
+      const s = mapS[t] || 0;
+      const totals = { harvest_weight: h, sales_weight: s, remain_weight: h - s };
+      return json({ ok:true, from, to, type, totals });
+    }
+  } catch (e) {
+    return json({ ok:false, error:`${e}` }, 500);
+  }
+
+  function json(payload, status = 200) {
+    return new Response(JSON.stringify(payload), {
+      status,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+}    const mapH = Object.create(null);
     hRows.forEach(r => mapH[r.t || 'other'] = Number(r.harvest_weight || 0));
 
     const mapS = Object.create(null);
