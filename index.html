@@ -158,7 +158,37 @@
             <div class="value"><span id="today-blooming-count">0</span> ก้อน</div>
           </div>
         </div>
+        <!-- คงเหลือเห็ดตามชนิด (หลังการ์ดก้อนเห็ดที่เปิดดอก) -->
+<div class="card">
+  <h3>คงเหลือเห็ดตามชนิด</h3>
 
+  <div class="filters-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:8px;">
+    <div class="form-group">
+      <label>ชนิดเห็ด</label>
+      <select id="stock-type" class="form-control">
+        <option value="all">ทั้งหมด</option>
+        <option value="nangfah">เห็ดนางฟ้า</option>
+        <option value="bod">เห็ดบด</option>
+        <option value="khon">เห็ดขอน</option>
+        <option value="other">อื่นๆ</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>ตั้งแต่วันที่</label>
+      <input type="date" id="stock-from" class="form-control">
+    </div>
+    <div class="form-group">
+      <label>ถึงวันที่</label>
+      <input type="date" id="stock-to" class="form-control">
+    </div>
+    <div class="form-group">
+      <label>&nbsp;</label>
+      <button id="stock-run" class="btn btn-block">ดูคงเหลือ</button>
+    </div>
+  </div>
+
+  <div id="stock-result"><em>กรุณาเลือกช่วงวันแล้วกด “ดูคงเหลือ”</em></div>
+</div>
         <!-- วางไว้ในหน้าแรกตำแหน่งที่อยากให้โชว์ -->
 <div class="card" id="market-card">
   <h3>ราคาตลาดกลาง</h3>
@@ -948,7 +978,85 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
 })();
 </script>
+<script>
+(function(){
+  const $ = (s) => document.querySelector(s);
+  const fmt = (x) => (x==null?0:Number(x)).toLocaleString('th-TH', { maximumFractionDigits: 2 });
+  const tName = (t) => ({nangfah:'เห็ดนางฟ้า', bod:'เห็ดบด', khon:'เห็ดขอน', other:'อื่นๆ'}[t] || t);
 
+  // default: ย้อนหลัง 30 วัน
+  const today = new Date();
+  const toStr = today.toISOString().slice(0,10);
+  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+  const fromStr = d30.toISOString().slice(0,10);
+  $('#stock-from').value = fromStr;
+  $('#stock-to').value = toStr;
+
+  $('#stock-run').addEventListener('click', loadStock);
+
+  async function loadStock(){
+    const type = $('#stock-type').value;
+    const from = $('#stock-from').value;
+    const to   = $('#stock-to').value;
+    $('#stock-result').innerHTML = 'กำลังโหลด...';
+
+    try{
+      const res = await fetch(`/api/stats/stock?type=${encodeURIComponent(type)}&from=${from}&to=${to}`);
+      const data = await res.json();
+      renderStock(data);
+    }catch(e){
+      $('#stock-result').innerHTML = `<span style="color:#b00">โหลดข้อมูลล้มเหลว: ${e}</span>`;
+    }
+  }
+
+  function renderStock(d){
+    if(!d.ok){ $('#stock-result').innerHTML = `<span style="color:#b00">${d.error||'เกิดข้อผิดพลาด'}</span>`; return; }
+
+    const t = d.totals;
+
+    // ตารางสรุปบนสุด
+    let html = `
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr><th>รายการ</th><th>น้ำหนัก (กก.)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>เก็บรวม</td><td>${fmt(t.harvest_weight)}</td></tr>
+            <tr><td>ขายรวม</td><td>${fmt(t.sales_weight)}</td></tr>
+            <tr><td><b>คงเหลือ</b></td><td><b>${fmt(t.remain_weight)}</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    // ถ้าเลือก "ทั้งหมด" ให้แสดงแยกตามชนิด
+    if (d.type === 'all' && Array.isArray(d.by_type) && d.by_type.length){
+      html += `
+        <h4 style="margin-top:10px">แยกตามชนิดเห็ด</h4>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr><th>ชนิดเห็ด</th><th>เก็บ (กก.)</th><th>ขาย (กก.)</th><th>คงเหลือ (กก.)</th></tr>
+            </thead>
+            <tbody>
+              ${d.by_type.map(r => `
+                <tr>
+                  <td>${tName(r.t)}</td>
+                  <td>${fmt(r.harvest_weight)}</td>
+                  <td>${fmt(r.sales_weight)}</td>
+                  <td>${fmt(r.remain_weight)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    $('#stock-result').innerHTML = html;
+  }
+})();
+</script>
 </body>
 </html>
+
 
