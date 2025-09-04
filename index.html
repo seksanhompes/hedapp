@@ -435,6 +435,41 @@ document.addEventListener('DOMContentLoaded', loadMarket);
 
       <!-- สรุปภาพรวม -->
       <section id="summary" class="page">
+        <!-- ตัวกรองสรุปราคา/น้ำหนักตามช่วงเวลา -->
+<div class="card">
+  <h3>ตัวกรองสรุป</h3>
+  <div class="filters-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+    <div class="form-group">
+      <label>ชนิดเห็ด</label>
+      <select id="sum-type" class="form-control">
+        <option value="all">ทั้งหมด</option>
+        <option value="nangfah">เห็ดนางฟ้า</option>
+        <option value="bod">เห็ดบด</option>
+        <option value="khon">เห็ดขอน</option>
+        <option value="other">อื่นๆ</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>ตั้งแต่วันที่</label>
+      <input type="date" id="sum-from" class="form-control">
+    </div>
+    <div class="form-group">
+      <label>ถึงวันที่</label>
+      <input type="date" id="sum-to" class="form-control">
+    </div>
+    <div class="form-group">
+      <label>&nbsp;</label>
+      <button id="sum-run" class="btn btn-block">ดูสรุป</button>
+    </div>
+  </div>
+</div>
+
+<!-- แสดงผลสรุป -->
+<div class="card">
+  <h3>ผลสรุป</h3>
+  <div id="sum-result"><em>กรุณาเลือกช่วงเวลาแล้วกด “ดูสรุป”</em></div>
+</div>
+
         <h2 class="page-title"><i class="fa-solid fa-chart-pie"></i> สรุปภาพรวม</h2>
         <div class="card">
           <h3>สรุปภาพรวมทั้งหมด</h3>
@@ -838,6 +873,82 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
 });
 </script>
+<script>
+(function(){
+  const $ = (sel) => document.querySelector(sel);
+  const fmt = (x) => (x==null ? 0 : Number(x)).toLocaleString('th-TH', { maximumFractionDigits: 2 });
+  const tName = (t) => ({nangfah:'เห็ดนางฟ้า', bod:'เห็ดบด', khon:'เห็ดขอน', other:'อื่นๆ'}[t] || t);
+
+  // ตั้งค่า default ช่วง 30 วันย้อนหลัง
+  const today = new Date();
+  const toStr = today.toISOString().slice(0,10);
+  const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+  const fromStr = d30.toISOString().slice(0,10);
+  $('#sum-from').value = fromStr;
+  $('#sum-to').value = toStr;
+
+  $('#sum-run').addEventListener('click', loadSummary);
+
+  async function loadSummary(){
+    const type = $('#sum-type').value;
+    const from = $('#sum-from').value;
+    const to   = $('#sum-to').value;
+    $('#sum-result').innerHTML = 'กำลังโหลด...';
+
+    try{
+      const res = await fetch(`/api/stats/range?type=${encodeURIComponent(type)}&from=${from}&to=${to}`);
+      const data = await res.json();
+      render(data);
+    }catch(e){
+      $('#sum-result').innerHTML = `<span style="color:#b00">โหลดข้อมูลล้มเหลว: ${e}</span>`;
+    }
+  }
+
+  function render(d){
+    if(!d.ok){ $('#sum-result').innerHTML = `<span style="color:#b00">${d.error||'เกิดข้อผิดพลาด'}</span>`; return; }
+
+    const t = d.totals;
+    let html = `
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr><th>รายการ</th><th>ค่าน้ำหนัก/จำนวน</th><th>ยอดเงิน</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>น้ำหนักที่เก็บได้ (กก.)</td><td>${fmt(t.harvest_weight)}</td><td>-</td></tr>
+            <tr><td>น้ำหนักที่ขาย (กก.)</td><td>${fmt(t.sales_weight)}</td><td>-</td></tr>
+            <tr><td>ยอดขายรวม (บาท)</td><td>-</td><td>${fmt(t.sales_amount)}</td></tr>
+            <tr><td>ราคาเฉลี่ย (บาท/กก.)</td><td>${fmt(t.avg_price)}</td><td>-</td></tr>
+            <tr><td>ก้อนที่ผลิต</td><td>${fmt(t.production_blocks)}</td><td>-</td></tr>
+            <tr><td>ก้อนที่เปิดดอก</td><td>${fmt(t.blooming_blocks)}</td><td>-</td></tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    if (d.type === 'all' && Array.isArray(d.by_type) && d.by_type.length){
+      html += `
+        <h4 style="margin-top:10px">สรุปแยกตามชนิด (ยอดขาย)</h4>
+        <div class="table-responsive">
+          <table>
+            <thead><tr><th>ชนิดเห็ด</th><th>น้ำหนักขาย (กก.)</th><th>ยอดขาย (บาท)</th></tr></thead>
+            <tbody>
+              ${d.by_type.map(r => `
+                <tr>
+                  <td>${tName(r.t)}</td>
+                  <td>${fmt(r.sales_weight)}</td>
+                  <td>${fmt(r.sales_amount)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+    }
+
+    $('#sum-result').innerHTML = html;
+  }
+})();
+</script>
 
 </body>
 </html>
+
